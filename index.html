@@ -1,0 +1,350 @@
+<html><head><base href="." target="_blank"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Customizable Probability Spinner</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: Arial, sans-serif;
+    background: #9f9f9f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    text-align: center;
+}
+
+.container {
+    background: #000000;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    max-width: 800px;
+    width: 100%;
+    text-align: center;
+}
+
+.spinner-container {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    margin: 20px auto;
+    text-align: center;
+}
+
+.spinner {
+    width: 100%;
+    height: 100%;
+    transition: transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+    text-align: center;
+}
+
+.spinner-arrow {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-top: 40px solid #ff4444;
+    z-index: 1;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.options-container {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.option-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 10px 0;
+    gap: 10px;
+}
+
+input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+}
+
+button {
+    padding: 10px 20px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.3s;
+    text-align: center;
+}
+
+button:hover {
+    background: #45a049;
+    text-align: center;
+}
+
+.error {
+    color: #ff4444;
+    margin: 10px 0;
+    text-align: center;
+}
+
+.total-probability {
+    color: #ffffff;
+    margin: 10px 0;
+    margin-top: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.delete-btn {
+    background: #ff4444;
+    padding: 8px;
+    width: 36px;
+    height: 36px;
+    text-align: center;
+}
+
+.delete-btn:hover {
+    background: #cc3333;
+    text-align: center;
+}
+
+.result {
+    color: white;
+    font-size: 1.5em;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+</style>
+</head><body>
+<div class="container">
+    <div id="result" class="result"></div>
+    <div class="title-container">
+        <input type="text" id="custom-title" placeholder="Enter your title..." value="Enter your title...">
+    </div>
+    <div class="spinner-container">
+        <div class="spinner-arrow"></div>
+        <svg class="spinner" viewBox="0 0 100 100">
+            <!-- Sections will be added dynamically -->
+        </svg>
+    </div>
+    <div class="options-container">
+        <div id="options-list"></div>
+        <button id="add-option">Add Option</button>
+        <div class="total-probability">Total Probability: <span id="total">0</span>%</div>
+        <div id="error" class="error"></div>
+    </div>
+    <button id="spin">Spin !!!</button>
+</div>
+
+
+<script>
+class ProbabilitySpinner {
+    constructor() {
+        this.options = [];
+        this.currentRotation = 0;
+        this.setupEventListeners();
+        this.addOption(); // Add initial option
+    }
+
+    setupEventListeners() {
+        document.getElementById('add-option').addEventListener('click', () => this.addOption());
+        document.getElementById('spin').addEventListener('click', () => this.spin());
+        document.getElementById('custom-title').addEventListener('input', () => {
+            document.getElementById('spinner-title').textContent = document.getElementById('custom-title').value;
+        });
+    }
+
+    addOption() {
+        const optionRow = document.createElement('div');
+        optionRow.className = 'option-row';
+        
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = 'Option name';
+        nameInput.className = 'option-name';
+        
+        const probInput = document.createElement('input');
+        probInput.type = 'number';
+        probInput.placeholder = 'Probability %';
+        probInput.className = 'option-probability';
+        probInput.min = 0;
+        probInput.max = 100;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.innerHTML = '×';
+        deleteBtn.onclick = () => this.deleteOption(optionRow);
+
+        [nameInput, probInput].forEach(input => {
+            input.addEventListener('input', () => this.updateSpinner());
+        });
+
+        optionRow.appendChild(nameInput);
+        optionRow.appendChild(probInput);
+        optionRow.appendChild(deleteBtn);
+        document.getElementById('options-list').appendChild(optionRow);
+        
+        // Set equal probabilities for all options
+        const options = document.getElementsByClassName('option-row');
+        const equalProb = (100 / options.length).toFixed(1);
+        Array.from(options).forEach(row => {
+            row.querySelector('.option-probability').value = equalProb;
+        });
+        
+        this.updateSpinner();
+    }
+
+    deleteOption(row) {
+        if (document.getElementsByClassName('option-row').length > 1) {
+            row.remove();
+            // Redistribute probabilities evenly after deletion
+            const options = document.getElementsByClassName('option-row');
+            const equalProb = (100 / options.length).toFixed(1);
+            Array.from(options).forEach(row => {
+                row.querySelector('.option-probability').value = equalProb;
+            });
+            this.updateSpinner();
+        }
+    }
+
+    updateSpinner() {
+        const options = Array.from(document.getElementsByClassName('option-row'));
+        let total = 0;
+        this.options = [];
+
+        options.forEach(row => {
+            const name = row.querySelector('.option-name').value || 'Option';
+            let prob = parseFloat(row.querySelector('.option-probability').value) || 0;
+            total += prob;
+            this.options.push({ name, probability: prob });
+        });
+
+        document.getElementById('total').textContent = total.toFixed(1);
+
+        if (total !== 100) {
+            // Distribute remaining/excess probability equally
+            const adjustment = (100 - total) / this.options.length;
+            this.options = this.options.map(opt => ({
+                ...opt,
+                probability: opt.probability + adjustment
+            }));
+            
+            // Update input fields
+            options.forEach((row, i) => {
+                row.querySelector('.option-probability').value = 
+                    this.options[i].probability.toFixed(1);
+            });
+        }
+
+        this.drawSpinner();
+    }
+
+    drawSpinner() {
+        const svg = document.querySelector('.spinner');
+        svg.innerHTML = '';// 清空舊的內容
+
+        if (this.options.length === 1) {
+        // 當只有一個選項時，畫出完整的圓形
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M 50 0 A 50 50 0 1 1 50 100 A 50 50 0 1 1 50 0 Z`); // 完整圓形
+        path.setAttribute('fill', '#FF6B6B');  // 預設顏色
+        svg.appendChild(path);
+        
+        // 顯示選項的名稱
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', 50);
+        text.setAttribute('y', 50);
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', 'white');
+        text.setAttribute('font-size', '10');
+        text.textContent = `${this.options[0].name} (${this.options[0].probability.toFixed(1)}%)`;
+        svg.appendChild(text);
+        
+        return; // 只需畫一個圓形，不需要繪製多個區塊
+    }
+        
+        let startAngle = 0;
+        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6', '#3498DB'];
+        
+        this.options.forEach((option, i) => {
+            const angle = (option.probability / 100) * 360;
+            const endAngle = startAngle + angle;
+            const largeArcFlag = angle > 180 ? 1 : 0;
+            
+            const startRad = (startAngle - 90) * Math.PI / 180;
+            const endRad = (endAngle - 90) * Math.PI / 180;
+            
+            const x1 = 50 + 50 * Math.cos(startRad);
+            const y1 = 50 + 50 * Math.sin(startRad);
+            const x2 = 50 + 50 * Math.cos(endRad);
+            const y2 = 50 + 50 * Math.sin(endRad);
+            
+            // 建立圓形扇形區段
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArcFlag} 1 ${x2} ${y2} Z`);
+            path.setAttribute('fill', colors[i % colors.length]);
+            
+             // 建立選項文字
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            const textAngle = startAngle + angle / 2;
+            const textRad = (textAngle - 90) * Math.PI / 180;
+            const textX = 50 + 35 * Math.cos(textRad);
+            const textY = 50 + 35 * Math.sin(textRad);
+            
+            text.setAttribute('x', textX);
+            text.setAttribute('y', textY);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', 'white');
+            text.setAttribute('font-size', '4');
+            text.textContent = `${option.name} (${option.probability.toFixed(1)}%)`;
+            
+            svg.appendChild(path);
+            svg.appendChild(text);
+            
+            startAngle = endAngle;
+        });
+    }
+
+    spin() {
+        const spinner = document.querySelector('.spinner');
+    const extraSpins = 5; // 轉動幾圈
+    const randomAngle = Math.random() * 360;
+    const totalRotation = 360 * extraSpins + randomAngle;
+    
+    this.currentRotation += totalRotation;
+    spinner.style.transform = `rotate(${this.currentRotation}deg)`;
+
+    // 計算結果
+    setTimeout(() => {
+        const normalizedAngle = (this.currentRotation % 360 + 360) % 360; // 確保角度為正
+        let accumulatedAngle = 0;
+
+        for (let i = this.options.length - 1; i >= 0; i--) {
+        const option = this.options[i];
+        const sliceAngle = (option.probability / 100) * 360;
+        accumulatedAngle += sliceAngle;
+
+        // 這裡修正邏輯，確保角度範圍對應正確
+        if (normalizedAngle >= accumulatedAngle - sliceAngle && normalizedAngle < accumulatedAngle) {
+            document.getElementById('result').textContent = `Result: ${this.options[i].name}`;
+            break;
+        }
+        }
+    }, 3000); // 等待旋轉完成（3秒）
+    }   
+}
+
+// Initialize the spinner
+const spinner = new ProbabilitySpinner();
+</script>
+</body></html>
